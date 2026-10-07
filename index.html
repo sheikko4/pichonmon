@@ -90,16 +90,30 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 const tournamentRef = ref(db, "tournament");
 
-const INITIAL = ["kanalis","noah","Relleno2","Ishi","Imperialfm","Sheikko","Iro","Twist","Relleno1","shishiba","hirade","Tenshii","Becruz","OrweelPizzz","Erick","kyoko"];
-
+const INITIAL = [
+  "kanalis",
+  "noah",
+  "Relleno2",
+  "Ishi",
+  "Imperialfm",
+  "Sheikko",
+  "Iro",
+  "Twist",
+  "Relleno1",
+  "shishiba",
+  "hirade",
+  "Tenshii",
+  "Becruz",
+  "OrweelPizzz",
+  "Erick",
+  "kyoko"
+];
 let state = {
   players: INITIAL.map(name=>({name,reserve:name==="Relleno1"||name==="Relleno2"})),
   groups:{A:[],B:[]}, matches:{A:[],B:[]}, playoffs:null, started:false
