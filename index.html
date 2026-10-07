@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PichónMan — Gen 5 Doubles OU</title>
+<style>
+:root{--bg:#0f1218;--panel:#181d27;--panel2:#202735;--text:#eef2f7;--muted:#9da7b8;--accent:#7c9cff;--good:#63d297;--warn:#ffd477;--border:#30394b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{padding:22px 26px;border-bottom:1px solid var(--border);background:#141923}h1{margin:0 0 5px;font-size:25px}.sub{color:var(--muted)}
+nav{display:flex;gap:6px;flex-wrap:wrap;padding:12px 18px;background:#141923;border-bottom:1px solid var(--border)}
+button,.btn{border:1px solid var(--border);background:var(--panel2);color:var(--text);padding:9px 13px;border-radius:8px;cursor:pointer}button:hover,.btn:hover{border-color:#53617a}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}button.danger{color:#ffaaa0}
+main{max-width:1250px;margin:auto;padding:20px}.tabpane{display:none}.tabpane.active{display:block}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:800px){.grid2{grid-template-columns:1fr}}
+input{background:#10141c;color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px}
+table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid var(--border);text-align:left}th{color:#bac4d5}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.muted{color:var(--muted)}
+.badge{display:inline-block;padding:3px 7px;border-radius:99px;background:#2b3445;color:#cbd5e6;font-size:12px}
+.groups{display:grid;grid-template-columns:1fr 1fr;gap:16px}@media(max-width:900px){.groups{grid-template-columns:1fr}}
+.match{display:grid;grid-template-columns:minmax(100px,1fr) 55px minmax(100px,1fr) 55px;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid var(--border)}
+.match input{width:100%;text-align:center}.match .p{text-align:center;font-weight:600}
+.status{margin:8px 0;color:var(--muted)}.ok{color:var(--good)}.warn{color:var(--warn)}
+.bracket{display:grid;grid-template-columns:repeat(3,minmax(250px,1fr));gap:18px;overflow:auto}.round{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px}.round h3{text-align:center}
+.pmatch{background:#121720;border:1px solid var(--border);border-radius:8px;padding:10px;margin:12px 0}.pmatch .row{display:flex;justify-content:space-between;gap:8px;margin:5px 0}.pmatch input{width:46px;text-align:center}
+.hidden{display:none!important}.login{max-width:430px}.login input{width:100%;margin:5px 0 10px}.error{color:#ff9288}.online{color:var(--good)}
+</style>
+</head>
+<body>
+<header>
+<h1>🐦 PichónMan — Gen 5 Doubles OU</h1>
+<div class="sub">14 jugadores · 2 grupos de 7 · Top 4 · Playoffs · Bo3 · sincronización en tiempo real</div>
+</header>
+<nav>
+<button class="tab active" data-tab="publico">Torneo</button>
+<button class="tab" data-tab="admin">Administrador</button>
+</nav>
+<main>
+<section id="publico" class="tabpane active">
+<div class="card">
+<h2>Estado del torneo</h2><div id="connection" class="status">Conectando…</div><div id="publicStatus" class="status"></div>
+</div>
+<div class="groups">
+<div><h2>Grupo A</h2><div id="publicA"></div></div>
+<div><h2>Grupo B</h2><div id="publicB"></div></div>
+</div>
+<div class="card"><h2>Playoffs</h2><div id="publicPlayoffs"></div></div>
+</section>
+
+<section id="admin" class="tabpane">
+<div id="loginBox" class="card login">
+<h2>Administrador</h2>
+<p class="muted">Solo el organizador debe iniciar sesión. No hay registro público.</p>
+<label>Email</label><input id="email" type="email" autocomplete="username">
+<label>Contraseña</label><input id="password" type="password" autocomplete="current-password">
+<button class="primary" id="loginBtn">Iniciar sesión</button><div id="loginError" class="error"></div>
+</div>
+<div id="adminPanel" class="hidden">
+<div class="card">
+<h2>Panel del organizador</h2><div id="adminUser" class="status"></div>
+<div class="actions"><button id="logoutBtn">Cerrar sesión</button><button class="primary" id="startBtn">Iniciar / reiniciar torneo</button><button id="exportBtn">Exportar JSON</button></div>
+</div>
+<div class="card"><h2>Participantes</h2><div id="players"></div></div>
+<div class="groups"><div><h2>Grupo A</h2><div id="adminA"></div></div><div><h2>Grupo B</h2><div id="adminB"></div></div></div>
+<div class="card"><h2>Playoffs</h2><div id="adminPlayoffs"></div></div>
+</div>
+</section>
+</main>
+
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+import {getDatabase, ref, onValue, set, serverTimestamp} from "https://www.gstatic.com/firebasejs/12.9.0/firebase-database.js";
+import {getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut} from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+
+/* ============================================================
+   PEGA AQUÍ LA CONFIGURACIÓN DE TU APP WEB DE FIREBASE.
+   Firebase Console → Project settings → Your apps → Web app.
+   ============================================================ */
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCf88oTfk8p3d_pVTaGHdCa26Tx4RmM0pc",
+  authDomain: "pichonmon.firebaseapp.com",
+  projectId: "pichonmon",
+  storageBucket: "pichonmon.firebasestorage.app",
+  messagingSenderId: "1008251600279",
+  appId: "1:1008251600279:web:017fb281aaa9936ec018d2",
+  measurementId: "G-K8D0DG3SXR"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
+const tournamentRef = ref(db, "tournament");
+
+const INITIAL = ["kanalis","noah","Relleno2","Ishi","Imperialfm","Sheikko","Iro","Twist","Relleno1","shishiba","hirade","Tenshii","Becruz","OrweelPizzz","Erick","kyoko"];
+
+let state = {
+  players: INITIAL.map(name=>({name,reserve:name==="Relleno1"||name==="Relleno2"})),
+  groups:{A:[],B:[]}, matches:{A:[],B:[]}, playoffs:null, started:false
+};
+let isAdmin=false;
+
+const $=id=>document.getElementById(id);
+function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
+function uid(){return crypto.randomUUID?.()||Math.random().toString(36).slice(2)+Date.now();}
+function validScore(a,b){return (a===2&&(b===0||b===1))||(b===2&&(a===0||a===1));}
+function makeMatches(ps){let out=[];for(let i=0;i<ps.length;i++)for(let j=i+1;j<ps.length;j++)out.push({id:uid(),p1:ps[i],p2:ps[j],s1:"",s2:""});return out;}
+function stats(g){
+ const d={};state.groups[g].forEach(n=>d[n]={name:n,w:0,l:0,gw:0,gl:0});
+ (state.matches[g]||[]).forEach(m=>{if(m.s1===""||m.s2==="")return;let a=+m.s1,b=+m.s2;d[m.p1].gw+=a;d[m.p1].gl+=b;d[m.p2].gw+=b;d[m.p2].gl+=a;if(a>b){d[m.p1].w++;d[m.p2].l++}else{d[m.p2].w++;d[m.p1].l++}});
+ return Object.values(d).sort((a,b)=>(b.w-a.w)||((b.gw-b.gl)-(a.gw-a.gl))||(b.gw-a.gw)||a.name.localeCompare(b.name));
+}
+function allGroupsDone(){return ["A","B"].every(g=>(state.matches[g]||[]).every(m=>m.s1!==""&&m.s2!==""))}
+function winner(m){if(!m||m.s1===""||m.s2===""||!validScore(+m.s1,+m.s2))return "";return +m.s1>+m.s2?m.p1:m.p2}
+function buildPlayoffs(){
+ if(!allGroupsDone())return null;
+ const A=stats("A").slice(0,4).map(x=>x.name),B=stats("B").slice(0,4).map(x=>x.name);
+ let p=state.playoffs||{qf:[],sf:[{id:uid(),p1:"",p2:"",s1:"",s2:""},{id:uid(),p1:"",p2:"",s1:"",s2:""}],final:{id:uid(),p1:"",p2:"",s1:"",s2:""}};
+ if(!p.qf.length)p.qf=[
+  {id:uid(),p1:A[0],p2:B[3],s1:"",s2:""},{id:uid(),p1:A[1],p2:B[2],s1:"",s2:""},
+  {id:uid(),p1:B[0],p2:A[3],s1:"",s2:""},{id:uid(),p1:B[1],p2:A[2],s1:"",s2:""}
+ ];
+ const w=p.qf.map(winner);p.sf[0].p1=w[0];p.sf[0].p2=w[1];p.sf[1].p1=w[2];p.sf[1].p2=w[3];
+ p.final.p1=winner(p.sf[0]);p.final.p2=winner(p.sf[1]); return p;
+}
+function renderRanking(g,editable=false){
+ let h='<div class="card"><h3>Clasificación</h3><table><tr><th>#</th><th>Jugador</th><th>V</th><th>D</th><th>J+</th><th>J-</th></tr>';
+ stats(g).forEach((r,i)=>h+=`<tr><td>${i+1}</td><td>${esc(r.name)} ${i<4?'<span class="badge">TOP 4</span>':''}</td><td>${r.w}</td><td>${r.l}</td><td>${r.gw}</td><td>${r.gl}</td></tr>`);
+ return h+'</table></div>';
+}
+function renderMatches(g,editable){
+ let h='<div class="card"><h3>Encuentros</h3>';
+ (state.matches[g]||[]).forEach(m=>h+=`<div class="match"><div class="p">${esc(m.p1)}</div>
+ ${editable?`<input maxlength="1" value="${m.s1}" data-score="${g}|${m.id}|s1">`:`<div>${m.s1||"–"}</div>`}
+ <div class="p">${esc(m.p2)}</div>
+ ${editable?`<input maxlength="1" value="${m.s2}" data-score="${g}|${m.id}|s2">`:`<div>${m.s2||"–"}</div>`}</div>`);
+ return h+'</div>';
+}
+function renderGroup(g,editable=false){return renderRanking(g,editable)+renderMatches(g,editable)}
+function pmatch(round,i,m,editable){
+ if(!m.p1&&!m.p2)return '<div class="pmatch muted">Pendiente</div>';
+ return `<div class="pmatch"><div class="small muted">Bo3</div>
+ <div class="row"><span>${esc(m.p1||"—")}</span>${editable?`<input maxlength="1" value="${m.s1}" data-ps="${round}|${i}|s1">`:`<b>${m.s1||"–"}</b>`}</div>
+ <div class="row"><span>${esc(m.p2||"—")}</span>${editable?`<input maxlength="1" value="${m.s2}" data-ps="${round}|${i}|s2">`:`<b>${m.s2||"–"}</b>`}</div></div>`;
+}
+function renderPO(editable){
+ if(!allGroupsDone())return '<div class="card muted">Completa los 42 encuentros de grupos para generar los playoffs.</div>';
+ const p=buildPlayoffs();state.playoffs=p;
+ return `<div class="bracket">
+ <div class="round"><h3>Cuartos</h3>${p.qf.map((m,i)=>pmatch("qf",i,m,editable)).join("")}</div>
+ <div class="round"><h3>Semifinales</h3>${p.sf.map((m,i)=>pmatch("sf",i,m,editable)).join("")}</div>
+ <div class="round"><h3>Final</h3>${pmatch("final",0,p.final,editable)}${winner(p.final)?`<p class="ok"><b>🏆 Campeón: ${esc(winner(p.final))}</b></p>`:""}</div>
+ </div>`;
+}
+function render(){
+ $("connection").innerHTML='<span class="online">● Conectado a la base de datos</span>';
+ if(!state.started){$("publicStatus").textContent="El torneo todavía no ha comenzado.";$("publicA").innerHTML="";$("publicB").innerHTML="";$("publicPlayoffs").innerHTML="";return}
+ const done=(state.matches.A||[]).filter(m=>m.s1!==""&&m.s2!=="").length+(state.matches.B||[]).filter(m=>m.s1!==""&&m.s2!=="").length;
+ $("publicStatus").textContent=`Encuentros completados: ${done}/42`;
+ $("publicA").innerHTML=renderGroup("A",false);$("publicB").innerHTML=renderGroup("B",false);$("publicPlayoffs").innerHTML=renderPO(false);
+ if(isAdmin){
+  $("players").innerHTML=state.players.map((p,i)=>`<div style="padding:6px 0">${i+1}. ${esc(p.name)} ${p.reserve?'<span class="badge">RESERVA</span>':''}</div>`).join("");
+  $("adminA").innerHTML=renderGroup("A",true);$("adminB").innerHTML=renderGroup("B",true);$("adminPlayoffs").innerHTML=renderPO(true);
+ }
+}
+async function save(){await set(tournamentRef,{...state,updatedAt:serverTimestamp()})}
+function start(){
+ const active=state.players.filter(p=>!p.reserve);if(active.length!==14)return alert("Deben existir exactamente 14 titulares.");
+ if(!confirm("Se reiniciarán resultados y grupos. ¿Continuar?"))return;
+ for(let i=active.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[active[i],active[j]]=[active[j],active[i]]}
+ state={players:state.players,groups:{A:active.slice(0,7).map(p=>p.name),B:active.slice(7).map(p=>p.name)},matches:{A:makeMatches(active.slice(0,7).map(p=>p.name)),B:makeMatches(active.slice(7).map(p=>p.name))},playoffs:null,started:true};
+ save();
+}
+document.addEventListener("click",async e=>{
+ const tab=e.target.closest(".tab");if(tab){document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".tabpane").forEach(x=>x.classList.remove("active"));tab.classList.add("active");$(tab.dataset.tab).classList.add("active");return}
+ if(e.target.id==="loginBtn"){try{await signInWithEmailAndPassword(auth,$("email").value,$("password").value);$("loginError").textContent=""}catch(x){$("loginError").textContent="Inicio de sesión rechazado. Comprueba email y contraseña."}}
+ if(e.target.id==="logoutBtn")await signOut(auth);
+ if(e.target.id==="startBtn")start();
+ if(e.target.id==="exportBtn"){const b=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="pichonman-torneo.json";a.click()}
+});
+document.addEventListener("change",async e=>{
+ if(!isAdmin)return;
+ const s=e.target.dataset.score;if(s){let[g,id,side]=s.split("|"),m=state.matches[g].find(x=>x.id===id);let v=e.target.value.replace(/[^0-2]/g,"").slice(0,1);m[side]=v;if(m.s1!==""&&m.s2!==""&&!validScore(+m.s1,+m.s2)){alert("Bo3: solo 2-0, 2-1, 0-2 o 1-2.");m[side]=""}state.playoffs=null;await save()}
+ const p=e.target.dataset.ps;if(p){let[r,i,side]=p.split("|"),m=r==="final"?state.playoffs?.final:state.playoffs?.[r]?.[+i];if(!m)return;let v=e.target.value.replace(/[^0-2]/g,"").slice(0,1);m[side]=v;if(m.s1!==""&&m.s2!==""&&!validScore(+m.s1,+m.s2)){alert("Bo3: solo 2-0, 2-1, 0-2 o 1-2.");m[side]=""}await save()}
+ render();
+});
+onValue(tournamentRef,s=>{if(s.exists()){state=s.val();if(!state.players)state={...state,players:INITIAL.map(name=>({name,reserve:name==="Relleno1"||name==="Relleno2"}))}}render()});
+onAuthStateChanged(auth,u=>{isAdmin=!!u;$("loginBox").classList.toggle("hidden",isAdmin);$("adminPanel").classList.toggle("hidden",!isAdmin);$("adminUser").textContent=isAdmin?`Sesión iniciada como ${u.email}`:"";render()});
+</script>
+</body>
+</html>
