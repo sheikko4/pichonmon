@@ -184,12 +184,49 @@ function render(){
  }
 }
 async function save(){await set(tournamentRef,{...state,updatedAt:serverTimestamp()})}
-function start(){
- const active=state.players.filter(p=>!p.reserve);if(active.length!==14)return alert("Deben existir exactamente 14 titulares.");
- if(!confirm("Se reiniciarán resultados y grupos. ¿Continuar?"))return;
- for(let i=active.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[active[i],active[j]]=[active[j],active[i]]}
- state={players:state.players,groups:{A:active.slice(0,7).map(p=>p.name),B:active.slice(7).map(p=>p.name)},matches:{A:makeMatches(active.slice(0,7).map(p=>p.name)),B:makeMatches(active.slice(7).map(p=>p.name))},playoffs:null,started:true};
- save();
+function start() {
+  if (state.players.filter(p => !p.reserve).length !== 14) {
+    return alert("Deben existir exactamente 14 titulares.");
+  }
+
+  if (!confirm("Se reiniciarán los resultados y grupos. ¿Continuar?")) {
+    return;
+  }
+
+  const groupA = [
+    "conotan",
+    "Jiri",
+    "Iro",
+    "kyoko",
+    "Nobu",
+    "OrweelPizzz",
+    "Tenshii"
+  ];
+
+  const groupB = [
+    "Imperialfm",
+    "Becruz",
+    "Ishi",
+    "kanalis",
+    "shishiba",
+    "Twist",
+    "Sheikko"
+  ];
+
+  const players = [...groupA, ...groupB];
+
+  state = {
+    players: players.map(name => ({ name, reserve: false })),
+    groups: { A: groupA, B: groupB },
+    matches: {
+      A: makeMatches(groupA),
+      B: makeMatches(groupB)
+    },
+    playoffs: null,
+    started: true
+  };
+
+  save();
 }
 document.addEventListener("click",async e=>{
  const tab=e.target.closest(".tab");if(tab){document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".tabpane").forEach(x=>x.classList.remove("active"));tab.classList.add("active");$(tab.dataset.tab).classList.add("active");return}
